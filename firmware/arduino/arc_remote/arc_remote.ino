@@ -1,23 +1,28 @@
 // firmware/arduino/arc_remote/arc_remote.ino
-// 协控固件: 本地点动按键 + 状态 LED + 蜂鸣器 + 串口桥接 DTU
+// YED 4G IoT 电弧点火机 - Arduino 协控固件 v1.0
+//
+// 职责:
+//   - 本地点动按键 → 通过串口通知 DTU 切换继电器
+//   - 接收 DTU 下行命令 → 同步状态 LED
+//   - 按键时蜂鸣器提示
+//
+// 引脚定义见 config.h
+// 串口协议: 9600,8,N,1
+//   - DTU → Arduino: "relay:1\n" / "relay:0\n"
+//   - Arduino → DTU: "{\"evt\":\"btn_toggle\"}\n"
+
 #include "config.h"
 
-// 全局状态
 volatile bool btnPressed = false;
-bool relayState = false;     // 镜像 DTU 下发的继电器状态
+bool relayState = false;
 unsigned long lastBtnMs = 0;
 
-// 按键中断服务程序
-void btnISR() {
-    btnPressed = true;
-}
+void btnISR() { btnPressed = true; }
 
-// 蜂鸣器短鸣
 void beepShort() {
     tone(BUZZER_PIN, 2000, BUZZER_SHORT_MS);
 }
 
-// 同步状态到 LED
 void syncLed() {
     digitalWrite(STATUS_LED_PIN, relayState ? HIGH : LOW);
 }
@@ -30,23 +35,24 @@ void setup() {
     digitalWrite(STATUS_LED_PIN, LOW);
     pinMode(BUZZER_PIN, OUTPUT);
 
-    Serial.println("{\"type\":\"boot\",\"fwv\":\"arduino-1.0.0\"}");
+    Serial.println(F("{\"type\":\"boot\",\"fwv\":\"arduino-1.0.0\"}"));
+    delay(200);
+    Serial.println(F("{\"type\":\"ready\"}"));
 }
 
 void loop() {
-    // 1. 处理本地按键(带消抖)
+    // 处理本地按键(带 50ms 消抖)
     if (btnPressed) {
         btnPressed = false;
         unsigned long now = millis();
         if (now - lastBtnMs > DEBOUNCE_MS) {
             lastBtnMs = now;
-            // 通过串口通知 DTU 切换继电器
-            Serial.println("{\"evt\":\"btn_toggle\"}");
+            Serial.println(F("{\"evt\":\"btn_toggle\"}"));
             beepShort();
         }
     }
 
-    // 2. 接收 DTU 下行同步命令(简化协议: 字符串 "relay:1" / "relay:0")
+    // 接收 DTU 下行同步
     if (Serial.available()) {
         String s = Serial.readStringUntil('\n');
         s.trim();
