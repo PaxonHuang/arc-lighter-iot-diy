@@ -5,6 +5,7 @@
 // 全局状态
 volatile bool btnPressed = false;
 bool relayState = false;     // 镜像 DTU 下发的继电器状态
+unsigned long lastBtnMs = 0;
 
 // 按键中断服务程序
 void btnISR() {
@@ -33,6 +34,30 @@ void setup() {
 }
 
 void loop() {
-    // 待 Task 3-4 实现
-    delay(100);
+    // 1. 处理本地按键(带消抖)
+    if (btnPressed) {
+        btnPressed = false;
+        unsigned long now = millis();
+        if (now - lastBtnMs > DEBOUNCE_MS) {
+            lastBtnMs = now;
+            // 通过串口通知 DTU 切换继电器
+            Serial.println("{\"evt\":\"btn_toggle\"}");
+            beepShort();
+        }
+    }
+
+    // 2. 接收 DTU 下行同步命令(简化协议: 字符串 "relay:1" / "relay:0")
+    if (Serial.available()) {
+        String s = Serial.readStringUntil('\n');
+        s.trim();
+        if (s == "relay:1") {
+            relayState = true;
+            syncLed();
+        } else if (s == "relay:0") {
+            relayState = false;
+            syncLed();
+        }
+    }
+
+    delay(50);
 }
