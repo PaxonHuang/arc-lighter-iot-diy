@@ -1,0 +1,42 @@
+{
+  "product_name": "高压电弧点火机-DIY",
+  "product_key": "YED_ARC_DIY",
+  "protocol": "yed_mqtt_object_model",
+  "datapoints": [
+    {
+      "id": "sw1",
+      "name": "电弧开关",
+      "type": "enum",
+      "access": "rw",
+      "values": {"0": "关", "1": "开"}
+    },
+    {
+      "id": "vbat",
+      "name": "电池电压",
+      "type": "int",
+      "access": "ro",
+      "unit": "mV",
+      "range": [0, 5000]
+    },
+    {
+      "id": "csq",
+      "name": "信号强度",
+      "type": "int",
+      "access": "ro",
+      "range": [0, 31]
+    },
+    {
+      "id": "arc_count",
+      "name": "点火次数累计",
+      "type": "int",
+      "access": "ro",
+      "range": [0, 999999]
+    },
+    {
+      "id": "btn_event",
+      "name": "本地按键事件",
+      "type": "event",
+      "access": "ro"
+    }
+  ]
+}
