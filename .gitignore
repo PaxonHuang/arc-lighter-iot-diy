@@ -1,0 +1,23 @@
+# Arduino
+firmware/arduino/*/build/
+*.hex
+*.elf
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
