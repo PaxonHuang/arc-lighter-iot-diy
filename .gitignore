@@ -2,17 +2,31 @@
 firmware/arduino/*/build/
 *.hex
 *.elf
+*.bin
+*.map
+*.o
 
 # Python
 __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
 
 # OS
 .DS_Store
 Thumbs.db
 desktop.ini
+~$*
+ehthumbs.db
 
 # IDE
 .vscode/
@@ -21,3 +35,6 @@ desktop.ini
 
 # Logs
 *.log
+
+# Claude / agent workspace
+.claude/worktrees/
