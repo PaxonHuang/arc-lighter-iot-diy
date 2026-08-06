@@ -23,14 +23,16 @@ def find_arduino():
 def test_boot():
     """验证 Arduino 上电打印 boot JSON"""
     ser = serial.Serial(find_arduino(), BAUD, timeout=2)
-    ser.dtr = False
-    time.sleep(0.5)
-    ser.dtr = True
-    time.sleep(2)
-    lines = []
-    while ser.in_waiting:
-        lines.append(ser.readline().decode().strip())
-    ser.close()
+    try:
+        ser.dtr = False
+        time.sleep(0.5)
+        ser.dtr = True
+        time.sleep(2)
+        lines = []
+        while ser.in_waiting:
+            lines.append(ser.readline().decode("utf-8", errors="replace").strip())
+    finally:
+        ser.close()
     boot = [l for l in lines if '"type":"boot"' in l]
     ready = [l for l in lines if '"type":"ready"' in l]
     assert len(boot) == 1, f"Expected 1 boot line, got {len(boot)}: {lines}"
@@ -41,11 +43,13 @@ def test_boot():
 def test_relay_sync_on():
     """通过串口发送 relay:1,期望 Arduino 拉高 LED"""
     ser = serial.Serial(find_arduino(), BAUD, timeout=1)
-    time.sleep(0.5)
-    ser.write(b"relay:1\n")
-    time.sleep(0.5)
-    # 无法直接读取 LED,但可观察 Arduino 是否回发其他数据
-    ser.close()
+    try:
+        time.sleep(0.5)
+        ser.write(b"relay:1\n")
+        time.sleep(0.5)
+        # 无法直接读取 LED,但可观察 Arduino 是否回发其他数据
+    finally:
+        ser.close()
     print("✅ relay:1 sent (LED should be on)")
 
 
