@@ -12,6 +12,7 @@
 - `cloud/` — 银尔达 IOT 平台配置
 - `hardware/` — 硬件接线、BOM、原理图
 - `test/` — 端到端测试脚本
+- `docs/yinerda-platform-ops-guide.md` — 银尔达三平台(test/DTU/IOT)配置联调操作指南
 
 ## 快速开始
 参见 SPEC 文档 §6 操作步骤。

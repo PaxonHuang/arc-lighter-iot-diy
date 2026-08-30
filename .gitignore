@@ -38,3 +38,7 @@ ehthumbs.db
 
 # Claude / agent workspace
 .claude/worktrees/
+
+# Agent workspace / tooling (not project files)
+.zcode/
+install.ps1
