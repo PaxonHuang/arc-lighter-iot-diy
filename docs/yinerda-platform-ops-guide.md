@@ -2,6 +2,8 @@
 
 > 2026-08-30 更新。基于 `Air780-YED-M100PG-C2-doc/` 官方文档（DTU固件实例讲解、任务和数据模板规范/调试方法、物模型MQTT协议、IOT平台介绍、常供电定位器案例）整理，结合本项目当前进展（远程开关 10 循环稳定性已通过，见 `docs/experiment-log.md`）。
 
+> **2026-08-31 实测修订（接线指南 v2）**：`config,set,doout,1,1` 返回 `error,2`——M100PG-C2 无 DO 硬件资源，**继电器改由 Arduino D7 驱动**，task.lua 已移除 PerSetDo；MQTT 下发 config 命令手打字面 `\r\n` 会造成 `error,1`（格式错），换行交给测试工具的"回车换行"选项。详见 `docs/wiring-guide.md` §1；IOT 平台三要素与 topic 见 `cloud/iot-platform.md`。PlatformIO 迁移已完成：`firmware/arduino/arc_remote/` 现为 PIO 工程（`pio run -t upload`），调试日志走 D5 SoftwareSerial，板载 USB(D0/D1) 留给 DTU 串口。
+
 ## 0. 三个官方站点/工具的角色（先分清，避免走错门）
 
 | 站点/工具 | 作用 | 是否收费 |
