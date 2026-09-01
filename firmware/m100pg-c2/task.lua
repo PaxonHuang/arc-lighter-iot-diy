@@ -2,7 +2,9 @@
 task.lua - M100PG-C2 主任务
 复制此代码到银尔达 DTU 配置平台 (https://dtu.yinerda.com) 的任务代码编辑框
 
-依赖: task_protocol.lua, task_telemetry.lua (本文件已整合所有逻辑,实际部署只需复制本文件)
+依赖: 无(本文件已整合所有逻辑,实际部署只需复制本文件)
+v2 (2026-08-31): 实测 M100PG-C2 无 doout 硬件资源(config,doout,error,2),
+移除 PerSetDo;继电器由 Arduino D7 驱动,本任务仅经 UART 下发 relay 命令
 ]]
 
 local taskname = "iotArcTask"
@@ -11,7 +13,6 @@ log.info(taskname, "===== START =====")
 -- 初始化
 PronetStopProRecCh(1)
 UartStopProRecCh(1)
-PerSetDo(1, 0)
 
 local nid, uid = 1, 1
 local relay_state = 0
@@ -62,12 +63,10 @@ while true do
         local j = json.decode(netr)
         if j and j.cmd == "set_relay" and j.param and j.param.sw1 ~= nil then
             if j.param.sw1 == 1 then
-                PerSetDo(1, 1)
                 relay_state = 1
                 arc_count = arc_count + 1
                 sync_arduino(1)
             else
-                PerSetDo(1, 0)
                 relay_state = 0
                 sync_arduino(0)
             end
@@ -89,7 +88,6 @@ while true do
         local j = json.decode(uartr)
         if j and j.evt == "btn_toggle" then
             relay_state = (relay_state == 1) and 0 or 1
-            PerSetDo(1, relay_state)
             if relay_state == 1 then
                 arc_count = arc_count + 1
             end

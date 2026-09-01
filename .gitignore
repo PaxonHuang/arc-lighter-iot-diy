@@ -42,3 +42,6 @@ ehthumbs.db
 # Agent workspace / tooling (not project files)
 .zcode/
 install.ps1
+
+# PlatformIO
+.pio/
