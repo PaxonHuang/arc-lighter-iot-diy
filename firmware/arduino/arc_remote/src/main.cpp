@@ -5,7 +5,7 @@
 //   - 继电器驱动(D7):接收 DTU 下行命令吸合/释放 — M100PG-C2 无 doout 资源,
 //     继电器控制权在本板(见 docs/wiring-guide.md v2)
 //   - 本地点动按键 → 通过串口通知 DTU 上报切换事件
-//   - 状态 LED 同步 + 按键蜂鸣提示
+//   - 状态 LED 同步
 //
 // 串口协议(9600,8,N,1):
 //   - DTU → Arduino: "relay:1\n" / "relay:0\n"
@@ -30,10 +30,6 @@ void dbgPrint(const __FlashStringHelper *s) {
 #endif
 }
 
-void beepShort() {
-    tone(BUZZER_PIN, 2000, BUZZER_SHORT_MS);
-}
-
 void applyRelay(bool on) {
     relayState = on;
     digitalWrite(RELAY_PIN, on ? HIGH : LOW);
@@ -51,7 +47,6 @@ void setup() {
     pinMode(RELAY_PIN, OUTPUT);
     digitalWrite(RELAY_PIN, LOW);      // 上电确保电弧回路断开
     digitalWrite(STATUS_LED_PIN, LOW);
-    pinMode(BUZZER_PIN, OUTPUT);
     pinMode(DTU_RST_PIN, OUTPUT);      // 预留 DTU 复位线,空闲保持高
     digitalWrite(DTU_RST_PIN, HIGH);
 
@@ -70,7 +65,6 @@ void loop() {
             lastBtnMs = now;
             Serial.println(F("{\"evt\":\"btn_toggle\"}"));
             dbgPrint(F("evt=btn_toggle"));
-            beepShort();
         }
     }
 
@@ -81,7 +75,6 @@ void loop() {
         if (s == "relay:1") {
             applyRelay(true);
             dbgPrint(F("relay=ON"));
-            beepShort();
         } else if (s == "relay:0") {
             applyRelay(false);
             dbgPrint(F("relay=OFF"));

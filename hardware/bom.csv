@@ -1,0 +1,34 @@
+# 器件清单 BOM — M100PG-C2 电弧点火机
+# v3 (2026-09-02)：依据商供原理图 img/lighter-high-Voltage-Transformer.jpg 与其 BOM 表整理；蜂鸣器已移除。
+# 说明：点火模块为成品 PCB（淘宝电弧点火器），下表列出其内部关键器件供理解/选型参考，DIY 时通常直接采购整板而非分立元件。
+
+=== 控制与通信 ===
+Item,Qty,Part,Value/NP,Notes
+U1,1,M100PG-C2 (Air780EPM),4G Cat1 DTU,银尔达；无 DO 资源，仅经 UART 下发命令
+MCU1,1,Arduino UNO R3,ATmega328P,PlatformIO 工程 firmware/arduino/arc_remote
+K1,1,TONGLING JQC-3FF-S-Z,1 路继电器模块(高电平触发),IN←UNO D7；切换动力电母线
+SW1,1,本地点动按键,tactile switch,UNO D2 → GND，INPUT_PULLUP
+LED1,1,状态 LED,红色+220Ω,UNO D4；吸合常亮
+DBG1,1,USB-TTL 适配器,—,接 UNO D5 看调试日志(SoftwareSerial)
+
+=== 供电 ===
+BT1,1,18650 电池(带保护板 DW01+8205A),1S 3.0~4.2V,总开关串在电池+
+PSU_A,1,MT3608 升压模块,整定 5.0V,→ UNO 5V 脚 + 继电器 VCC
+PSU_B,1,升压模块(第二路或同一母线),整定 12.0V,→ 继电器 COM(点火模块动力电入口)
+
+=== 点火模块（ZVS 推挽自激振荡升压 · 整板）— 对应原理图位号 ===
+Ref,Qty,Part,Value/NP,Function
+F1,1,保险丝,fuse,输入过流保护
+D5/D6,1,SS54,肖特基二极管,母线防反/整流
+Q1/Q2,2,SS8050,NPN,推挽振荡管
+T1,1,磁环驱动变压器,L1:L2≈1:1,正反馈启动
+R1/R2,2,0805,100Ω,栅极/基极限流
+C1/C2/C3,3,电解,47µF/25V,母线滤波/振荡定时(位于母线侧→触电风险)
+L3,1,EE16 高压变初级,0-7t-0-7t-0,ZVS 推挽初级绕组
+T2,1,EE16 高压变次级 L4,1050T,升压感应绕组
+D1/D2/D3/D4,4,FR107,1A/1000V,次级全桥整流
+R5/R6,2,电阻,120k,启动/偏置
+R7,1,电阻,1M,泄放
+D7,1,稳压管,zener,钳位/指示
+C4/C5/C6,3,高压瓷片电容,陶瓷,次级高压滤波(断电后需充分放电)
+E,1,放电电极,针尖↔板状,间隙 ~5mm(BOM 标注)

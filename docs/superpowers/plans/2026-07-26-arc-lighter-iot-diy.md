@@ -1,5 +1,12 @@
 # 高压电弧点火机 4G IoT 远程控制系统 — 实施计划
 
+> ⚠️ **【历史设计文档 · 部分已作废，勿作为当前实现依据】**（2026-09-02 标注）
+> 本文件是 2026-07-26 的初版计划，其中以下结论已被实测推翻或改动：
+> - **"doout 驱动继电器"已作废**：M100PG-C2 无 DO 硬件资源（`config,set,doout` 返回 `error,2`），继电器改由 **Arduino UNO D7** 驱动，DTU 经 UART 下发 `relay:1/relay:0`。
+> - **"XL6009→D880 单管自激、24V 母线"已作废**：商供点火模块实为 **DC12V 输入的 ZVS 推挽自激振荡升压**电路（见 `img/lighter-high-Voltage-Transformer.jpg`）。
+> - **蜂鸣器功能已全部移除**（固件不再使用 D8）。
+> **当前权威文档以 `docs/wiring-guide.md`（v3）、`cloud/iot-platform.md`、`docs/yinerda-platform-ops-guide.md` 为准。** 本计划仅保留作历史脉络参考。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 基于 M100PG-C2 + TONGLING 光耦继电器 + Arduino UNO + D880 + 18650 等 DIY 器件,构建由银尔达 IOT 平台远程控制的高压电弧点火装置。

@@ -12,7 +12,6 @@
 #define LOCAL_BTN_PIN    2   // 本地点动按键(中断触发)
 #define STATUS_LED_PIN   4   // 状态 LED(继电器吸合时常亮)
 #define RELAY_PIN        7   // 继电器模块 IN(高电平触发) — 继电器控制权在本板
-#define BUZZER_PIN       8   // 有源蜂鸣器
 #define DEBUG_TX_PIN     5   // 调试日志输出口(接 USB-TTL 适配器 RX)
 #define DTU_RST_PIN      6   // 预留:接 DTU RST 做异常恢复(本版未启用,保持高电平)
 
@@ -24,8 +23,5 @@
 
 // === 防抖 ===
 #define DEBOUNCE_MS      50
-
-// === 蜂鸣器时长 ===
-#define BUZZER_SHORT_MS  100
 
 #endif
