@@ -45,6 +45,12 @@
 
 ## 2. 分阶段操作步骤
 
+> **串口直配三条铁律（2026-09-03 实测教训，务必遵守）**：
+> 1. **改完参数最后必须 `config,set,save`**——手册《基本命令》§9："设置参数后，最后一条命令是保存，必须保存后前面的命令才生效"。save 会触发设备自动重启。漏掉 save = 白配（断电即丢）。
+> 2. **`paramsrc` 别设成 1**。手册 §13：paramsrc=1 → "设备将不再去服务器请求数据"（纯串口模式），这会**锁死 dtu.yinerda.com 的 web 下发**（含任务 Lua、网络通道参数）。联调期用 `config,set,paramsrc,0`（串口+web 都可）或干脆不动它（出厂默认 2=web），改完 save。
+> 3. **阶段 A 走 MQTT 就用 `config,set,mqtt,...`，不是 `config,set,tcp,...`**。tcp 与 mqtt 是两种协议命令；MQTT 测试需要 clientId/user/pass/订阅topic/发布topic 等字段（见手册《网络协议命令》§6 示例）。只配 tcp 指向裸 broker 端口不会完成 MQTT 握手。
+> 4. 附：`config,get,ttluart` 返回 error,1 属正常——ttluart 是**串口通道名**（用于 set tcp/mqtt 的第二参数），本身不是可 get 的配置项；error,1 = "本设备不支持该命令"。M100PG-C2 主串口在 set 命令里填 `uart`。
+
 ### 阶段 A：不依赖 IOT 平台，先打通 MQTT 链路（推荐下一步从这里开始）
 1. 浏览器打开 http://test.yinerda.com → "MQTT测试工具" → "打开"，记下：服务器地址/域名、端口、ClientID、Username、Password（三要素仅测试用，10 分钟无交互失效，重刷新重取）。
 2. 浏览器打开 https://dtu.yinerda.com，登录 → 设备管理确认设备已添加、已建分组并分配（首次使用看《WEB配置入门教程》）。
