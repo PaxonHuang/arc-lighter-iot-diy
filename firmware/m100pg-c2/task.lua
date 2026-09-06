@@ -4,7 +4,10 @@ task.lua - M100PG-C2 主任务
 
 依赖: 无(本文件已整合所有逻辑,实际部署只需复制本文件)
 v2 (2026-08-31): 实测 M100PG-C2 无 doout 硬件资源(config,doout,error,2),
-移除 PerSetDo;继电器由 Arduino D7 驱动,本任务仅经 UART 下发 relay 命令
+  移除 PerSetDo;继电器由 Arduino D7 驱动,本任务仅经 UART 下发 relay 命令
+v3 (2026-09-06): 加入 relay:1 超时自动关断(RELAY_TIMEOUT_MS=4000)
+  点火模块 ZVS 无反馈闭环,单次通电>5s 会过热烧管/磁芯,
+  强制 4s 后自动 relay:0 并上报 {type="relay_timeout"} 事件
 ]]
 
 local taskname = "iotArcTask"
@@ -15,7 +18,9 @@ PronetStopProRecCh(1)
 UartStopProRecCh(1)
 
 local nid, uid = 1, 1
+local RELAY_TIMEOUT_MS = 4000   -- relay:1 最长保持 4s(安全阈值)
 local relay_state = 0
+local relay_on_ms = 0           -- 0=当前未吸合;非 0=吸合时刻(os.time()*1000)
 local arc_count = 0
 local last_tele_ms = 0
 
@@ -56,6 +61,21 @@ end
 
 -- 主循环
 while true do
+    -- 0. 安全闸: relay:1 超时自动关断
+    if relay_state == 1 and relay_on_ms > 0
+       and (os.time() * 1000 - relay_on_ms) > RELAY_TIMEOUT_MS then
+        log.warn(taskname, "relay timeout auto-off")
+        relay_state = 0
+        relay_on_ms = 0
+        sync_arduino(0)
+        local ev = json.encode({
+            cmd = "event",
+            did = gen_did(),
+            param = {type = "relay_timeout", sw1 = 0}
+        })
+        send_json(ev)
+    end
+
     -- 1. 处理 MQTT 下行
     local netr = PronetGetRecChAndDel(nid)
     if netr then
@@ -64,10 +84,12 @@ while true do
         if j and j.cmd == "set_relay" and j.param and j.param.sw1 ~= nil then
             if j.param.sw1 == 1 then
                 relay_state = 1
+                relay_on_ms = os.time() * 1000
                 arc_count = arc_count + 1
                 sync_arduino(1)
             else
                 relay_state = 0
+                relay_on_ms = 0
                 sync_arduino(0)
             end
             -- 应答
@@ -90,6 +112,9 @@ while true do
             relay_state = (relay_state == 1) and 0 or 1
             if relay_state == 1 then
                 arc_count = arc_count + 1
+                relay_on_ms = os.time() * 1000
+            else
+                relay_on_ms = 0
             end
             sync_arduino(relay_state)
             -- 上报事件
