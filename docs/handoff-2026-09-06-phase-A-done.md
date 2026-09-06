@@ -10,7 +10,7 @@
 | paramsrc | `2`（web 模式，阶段 B 可走 dtu.yinerda.com 部署） | 串口 A0 查询 |
 | 通道 1 协议 | **mqtt**（不是 tcp——昨天 trap） | `config,set,mqtt,1,uart,120,...` |
 | MQTT server | `43.139.170.206:1002`（test.yinerda.com 公共测试 broker） | A1 工具给的 |
-| ClientID | `7c037f41c7703c7c74624a8bf4b469cc` | 同上 |
+| ClientID | `3a4dbbc357fb31a9f41c2f4330946720` | **2026-09-06 21:49 刷新后**（旧 `7c037f41...` 已 10 分钟过期被服务器回收） |
 | Username | 同 ClientID | 同上（测试服务器怪癖，正常） |
 | Password | `88888888` | 同上 |
 | MQTT 心跳 | 120s | A2 配的 |
@@ -19,12 +19,12 @@
 | QOS | 订阅/发布 = 0/0 | A2 配的 |
 | 设备订阅 topic | `yed/arc/down`（接收命令） | A2 自定义 |
 | 设备发布 topic | `yed/arc/up`（发出应答/遥测） | A2 自定义 |
-| LBS 定位 | 60s 间隔（**RAM 里**，save 后才进 flash） | 昨天的 `config,set,location,1,1,60,0,0,1` |
-| netstatus,1 | `1`（已连） | A3 验收 |
+| LBS 定位 | 60s 间隔（**已 save 进 flash**，2026-09-06 21:49 完成） | 昨天 RAM 残留 `config,set,location,1,1,60,0,0,1` + 21:49 save 固化 |
+| netstatus,1 | `1`（已连） | A3 验收 + 2026-09-06 21:50 再次确认（save 后重启） |
 | ssta | `4`（至少一路通道连接服务器成功） | A3 验收 |
 | paramver | `12`（save 时 11→12） | A3 验收 |
 
-**重要**：测试 broker 三要素 **10 分钟无交互就过期**。新会话开始时若发现浏览器端三要素已失效，**只需刷新 test.yinerda.com MQTT工具拿新三要素 + 用相同命令格式重配通道 1**（命令结构不变，只换 7 个字段值）。
+**重要**：测试 broker 三要素 **10 分钟无交互就过期**。**已实测**：2026-09-06 21:49 刷新后 ClientID 从 `7c037f41...` 变成 `3a4dbbc3...`，其他字段不变。**重配命令格式完全一致，只换 7 个字段值即可**（已在你 21:49 那次操作中验证）。
 
 ## 2. 已识别 + 已修复的坑（避免重复踩）
 
@@ -41,19 +41,21 @@
 
 新会话接手**严格按这个顺序**做，每步做完贴串口/日志/截图。
 
-### B-1：固化 RAM 配置（30s）
+### B-1：固化 RAM 配置（30s）✅ **已完成 2026-09-06 21:49**
 ```
-config,set,save
+config,set,save   → config,save,ok + 设备重启
 ```
-期望 `config,save,ok` + 设备 2s 后重启。等 30s 让设备重新连 broker。
+**用户实测记录**：`config,set,save` → `config,save,ok` → 设备自动重启 → 重启后 `config,get,netstatus,1` → `config,netstatus,ok,1` + 浏览器 MQTT 客户端状态变 "成功"。LBS 60s 间隔 RAM 残留**已固化进 flash**。
 
-### B-2：确认链路仍通
+### B-2：确认链路仍通 ✅ **已完成 2026-09-06 21:50**
 ```
-config,get,netstatus,1
+config,get,netstatus,1   → config,netstatus,ok,1
 ```
-期望 `config,netstatus,ok,1`。**这条不通过就停**，先排查（多半是测试 broker 三要素过期，参考 §1 末尾说明）。
+**用户实测记录**：save 后重启 + 浏览器 MQTT 客户端连接状态变 "成功"。**B-1+B-2 已合并完成**。
 
-### B-3：dtu.yinerda.com 部署 task.lua（5min）
+> ⚠️ **顺带被刷新的字段**：因测试 broker 三要素 21:49 已过期（10 分钟无操作），用户先刷了浏览器拿新三要素 → 用新 ClientID `3a4dbbc3...` 重发了 `config,set,mqtt,...` → `config,mqtt,ok` → 再 save。命令结构不变，**三要素字段值已换新**。
+
+### B-3：dtu.yinerda.com 部署 task.lua（5min）⏭️ **下一步**
 1. 浏览器打开 https://dtu.yinerda.com → 登录 → 设备管理 → 找 IMEI `864865083079369` 的设备 → 进分组
 2. 任务代码编辑框 → 全选粘贴 `firmware/m100pg-c2/task.lua` 整文件 → 保存
 3. **不要手动改 task.lua**——Lua 语法错会导致设备无限重启
@@ -85,6 +87,8 @@ config,get,netstatus,1
    这是 v3 新加的 4s 超时触发事件。
 
 **5 步全过 → 阶段 B 链路 OK**。之后接 UNO 测 D7 物理控制。
+
+**实际进度（截至 2026-09-06 21:50）**：B-1 ✅ + B-2 ✅ 已合并完成（save → 重启 → 重连成功）。**下一步是 B-3：dtu.yinerda.com 部署 task.lua**。B-4 / B-5 仍是验证步骤。
 
 ## 4. 关键文件 / Git 状态
 
