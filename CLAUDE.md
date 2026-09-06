@@ -30,8 +30,21 @@
 - ⚠️ **`Air780-YED-M100PG-C2-doc/graphify-out/` 是知识图谱生成缓存（53 个 JSON），非厂商文档，请勿当作事实来源阅读。**
 - 与本项目无关、无需主动阅读的官方分支：GPS/定位案例、HTTP/WebSocket/UDP 配置、Modbus 采集、低功耗等——用到再看，不必预读。
 
-## 5. 下一步开发路线（阶段 A）
-**目标：不依赖 IOT 平台，先打通 MQTT 链路。** 待办要点：
-- 核对 IMEI 第 10 位不一致问题（`wiring-guide.md §1.3` / `iot-platform.md` 标注的 `0↔6`），否则通道鉴权可能失败。
-- DTU 网络通道 1 指向 broker（先用公共测试 broker 或本地 mosquitto，绕开 IOT 平台），验证 `PronetGetNetSta==1`。
-- task.lua 上行/下行 JSON 收发经 raw MQTT 客户端可观测；加入 relay 超时自动关断。
+## 5. 下一步开发路线（阶段 A → B）
+**当前状态：阶段 A 已完成 ✅，正待进入阶段 B。**
+
+**阶段 A 完成项**（详见 `docs/handoff-2026-09-06-phase-A-done.md`）：
+- ✅ 设备 IMEI 已定位：`864865083079369`，与 `cloud/iot-platform.md` 存储的 `...679369` 第10位不一致——平台记录错误（设备权威），阶段 C 前必须先在 iot.yinerda.com 删除旧设备、用正确 IMEI 重建。
+- ✅ DTU 通道 1 已用 `config,set,mqtt,1,uart,120,43.139.170.206:1002,...` 配通 test.yinerda.com 公共测试 broker（10 分钟无交互过期，重刷重配）。
+- ✅ 重启后 netstatus=1 / ssta=4；串口 `config,get,imei/csq/vbatt` 全部正常应答；浏览器订阅 yed/arc/up 看到设备消息。
+- ✅ task.lua 已加 4s relay:1 超时（ZVS 安全），commit `f101184`。
+- ⚠️ 设备当前 RAM 里还有 LBS 60s 间隔配置未 save；部署 task.lua 前**必须再发一次 `config,set,save`** 固化。
+
+**阶段 B · task.lua 部署 + 验证（接下来要做的）**：
+1. 串口 `config,set,save`（固化 LBS）→ 等30s → `config,get,netstatus,1` 应为 ok,1。
+2. 登录 dtu.yinerda.com → 分组任务代码框粘贴 `firmware/m100pg-c2/task.lua`（带超时）→ 保存。
+3. Luatools_v3 看日志确认 `iotArcTask ===== START =====`。
+4. 浏览器 test.yinerda.com 工具发 `{"cmd":"set_relay","did":"t1","param":{"sw1":1}}` 到 yed/arc/down → 期望 yed/arc/up 收到 `set_relay_bck`（did=t1）；4s 后收到 `event {type:"relay_timeout"}`。
+5. 之后接 UNO D7 硬件验证（万用表测高电平）。
+
+**阶段 C（暂缓）**：用正确 IMEI 在 iot.yinerda.com 删除重建设备 → 重新拿三要素 → 回填 `cloud/iot-platform.md`。
