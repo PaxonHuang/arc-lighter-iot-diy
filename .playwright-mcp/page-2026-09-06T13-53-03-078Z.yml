@@ -1,0 +1,42 @@
+- generic [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e7]: DTU管理平台
+    - generic [ref=e10]:
+      - tablist [ref=e11]:
+        - generic [ref=e12]:
+          - generic:
+            - generic:
+              - 'generic "图标: left"'
+          - generic:
+            - generic:
+              - 'generic "图标: right"'
+          - generic [ref=e16]:
+            - tab "手机登录" [selected] [ref=e17] [cursor=pointer]
+            - tab "邮箱登录" [ref=e18] [cursor=pointer]
+      - generic:
+        - tabpanel
+    - generic [ref=e20]:
+      - generic [ref=e22]:
+        - generic [ref=e23]: "手机号:"
+        - textbox "手机号:" [ref=e27]:
+          - /placeholder: 请输入手机账号
+      - generic [ref=e29]:
+        - generic [ref=e30]: "密码:"
+        - textbox "密码:" [ref=e34]:
+          - /placeholder: 请输入密码
+      - generic [ref=e37]:
+        - generic [ref=e38]: "图形验证码:"
+        - textbox "图形验证码:" [ref=e43]:
+          - /placeholder: 不区分大小写
+      - button "登录" [ref=e47] [cursor=pointer]
+      - generic [ref=e48]:
+        - generic:
+          - link "忘记密码" [ref=e49] [cursor=pointer]:
+            - /url: "#/user/findPassword"
+          - link "注册账户" [ref=e50] [cursor=pointer]:
+            - /url: "#/user/register"
+  - generic [ref=e52]:
+    - generic [ref=e53]: 版权所有 © 深圳市银尔达电子有限公司
+    - link "粤ICP备15076131号-1" [ref=e55] [cursor=pointer]:
+      - /url: https://beian.miit.gov.cn/#/Integrated/index
+    - generic [ref=e57]: 版本号：20260721_01
