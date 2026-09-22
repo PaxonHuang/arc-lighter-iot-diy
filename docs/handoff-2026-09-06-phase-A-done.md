@@ -1,4 +1,4 @@
-# Handoff · 阶段 A 完成（2026-09-06）
+# Handoff · 阶段 A 完成（2026-09-06）+ 阶段 B 进展（2026-09-22）
 
 > 本文件是 **CLAUDE.md §5** 的补充——记录 2026-09-06 阶段 A 验收后的设备实际状态、已识别的坑、阶段 B 的精确下一步。新会话接手时**先读 CLAUDE.md，再读本文件**。
 
@@ -89,6 +89,20 @@ config,get,netstatus,1   → config,netstatus,ok,1
 **5 步全过 → 阶段 B 链路 OK**。之后接 UNO 测 D7 物理控制。
 
 **实际进度（截至 2026-09-06 21:50）**：B-1 ✅ + B-2 ✅ 已合并完成（save → 重启 → 重连成功）。**下一步是 B-3：dtu.yinerda.com 部署 task.lua**。B-4 / B-5 仍是验证步骤。
+
+### B-3 后续更新（2026-09-22 用户完成）
+用户在 dtu.yinerda.com「任务」tab 把 task.lua v3（带 4s 超时）粘贴进去 → 点保存参数 → 设备自动重启拉新任务。设备现在**已部署 task.lua**。dtu web 页面看到的 ClientID 是 `eb5948ae86aabf4dcf5dfaa410d0a33d`（再次刷新后的——意味着用户在 09-22 又刷新过 test 工具页面，并重配了通道 1；新 ClientID 已下发**）。
+
+### B-4 关键发现：Luatools 复选框 + 波特率（M100PG-C2 = CH340，不是 Air780 原生 USB）
+用户按我之前给的指导（Luatools 勾「4G模块USB打印」）尝试**没看到 `iotArcTask ===== START =====` 日志**。根因：
+
+- **M100PG-C2 的 USB 口是通过 CH340 转出的传统串口**（不是 Air780 原生 USB CDC）
+- Luatools 的「4G模块USB打印」复选框只适用于**原生 USB CDC 的 Air780 裸模块**
+- 正确做法：**勾 ☑「通用串口打印」**（不是 4G模块USB打印）
+- 波特率依次试 **9600 → 115200 → 921600**（YED DTU 默认日志波特率 9600）
+- Luatools 和 YEDTestTools **不能同时占用同一个 COM 端口**（COM15）
+
+**绝对不要刷固件**：M100PG-C2 已经预装 YED_DTU3 固件（带 Lua 解释器），刷 LuatOS/AT/iRTU 固件会破坏 DTU 的 MQTT 透传 + config 命令 + task.lua 框架。
 
 ## 4. 关键文件 / Git 状态
 

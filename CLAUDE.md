@@ -31,20 +31,24 @@
 - 与本项目无关、无需主动阅读的官方分支：GPS/定位案例、HTTP/WebSocket/UDP 配置、Modbus 采集、低功耗等——用到再看，不必预读。
 
 ## 5. 下一步开发路线（阶段 A → B）
-**当前状态：阶段 A 已完成 ✅，正待进入阶段 B。**
+**当前状态：阶段 A 已完成 ✅，阶段 B-1/B-2/B-3 已完成 ✅，卡在 B-4 Luatools 看 task.lua 日志。**
 
 **阶段 A 完成项**（详见 `docs/handoff-2026-09-06-phase-A-done.md`）：
 - ✅ 设备 IMEI 已定位：`864865083079369`，与 `cloud/iot-platform.md` 存储的 `...679369` 第10位不一致——平台记录错误（设备权威），阶段 C 前必须先在 iot.yinerda.com 删除旧设备、用正确 IMEI 重建。
 - ✅ DTU 通道 1 已用 `config,set,mqtt,1,uart,120,43.139.170.206:1002,...` 配通 test.yinerda.com 公共测试 broker（10 分钟无交互过期，重刷重配）。
 - ✅ 重启后 netstatus=1 / ssta=4；串口 `config,get,imei/csq/vbatt` 全部正常应答；浏览器订阅 yed/arc/up 看到设备消息。
 - ✅ task.lua 已加 4s relay:1 超时（ZVS 安全），commit `f101184`。
-- ⚠️ 设备当前 RAM 里还有 LBS 60s 间隔配置未 save；部署 task.lua 前**必须再发一次 `config,set,save`** 固化。
 
-**阶段 B · task.lua 部署 + 验证（接下来要做的）**：
-1. 串口 `config,set,save`（固化 LBS）→ 等30s → `config,get,netstatus,1` 应为 ok,1。
-2. 登录 dtu.yinerda.com → 分组任务代码框粘贴 `firmware/m100pg-c2/task.lua`（带超时）→ 保存。
-3. Luatools_v3 看日志确认 `iotArcTask ===== START =====`。
-4. 浏览器 test.yinerda.com 工具发 `{"cmd":"set_relay","did":"t1","param":{"sw1":1}}` 到 yed/arc/down → 期望 yed/arc/up 收到 `set_relay_bck`（did=t1）；4s 后收到 `event {type:"relay_timeout"}`。
-5. 之后接 UNO D7 硬件验证（万用表测高电平）。
+**阶段 B 进展（截至 2026-09-22 23:49）**：
+- ✅ B-1：RAM 配置 save → 已固化（含 LBS 60s）
+- ✅ B-2：save 后重启 + MQTT 链路复测 ok,1
+- ✅ B-3：dtu.yinerda.com「任务」tab 已粘贴 task.lua v3 + 点保存参数 + 设备自动重启拉任务
+- ⏸ **B-4 阻塞**：Luatools 看不到 `iotArcTask ===== START =====` 日志
+  - **根因**：M100PG-C2 用 **CH340 转串口**（不是 Air780 原生 USB CDC），Luatools 必须勾 ☑「**通用串口打印**」（**不是**「4G模块USB打印」）
+  - 波特率依次试 **9600 → 115200 → 921600**
+  - 完整修复指南见 handoff 文档 §B-4
+- ⏭ B-5（test 工具发 set_relay JSON）待 B-4 通过
+
+**绝对不要刷 LuatOS/AT/iRTU 固件**——M100PG-C2 已预装 YED_DTU3 固件（带 Lua 解释器跑 task.lua），刷其他固件会破坏 DTU 的 MQTT 透传 + config 命令 + task.lua 框架。
 
 **阶段 C（暂缓）**：用正确 IMEI 在 iot.yinerda.com 删除重建设备 → 重新拿三要素 → 回填 `cloud/iot-platform.md`。
