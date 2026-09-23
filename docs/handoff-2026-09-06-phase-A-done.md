@@ -121,3 +121,104 @@ config,get,netstatus,1   → config,netstatus,ok,1
 ## 5. 新会话开场白（建议粘贴）
 
 > "我在接手 M100PG-C2 电弧点火机项目（仓库 arc-lighter-iot-diy）。请先读 CLAUDE.md 和 docs/handoff-2026-09-06-phase-A-done.md——阶段 A 已完成（mqtt 链路通、test broker 已配、task.lua 已加超时），下一步是阶段 B：先 `config,set,save` 固化 RAM 里的 LBS 配置，再走 dtu.yinerda.com 部署 task.lua，最后用 test 工具发 set_relay JSON 验证双向链路。请告诉我你会怎么开始。"
+
+---
+
+## 6. B-4 阻塞真实根因 + 修复记录（2026-09-23）
+
+### 6.1 用户 11:26 测试结果
+| 项 | 值 | 状态 |
+|---|---|---|
+| netstatus,1 | `0` | ⚠️ 链路掉线 |
+| ssta | `3` | ⚠️ 有网无服务器 |
+| firmwarever | `YED_DTU3_1.1.21` | ✅ |
+| imei | `864865083079369` | ✅ 与权威一致 |
+| iccid | `89860827102591757172` | ✅ |
+| paramver | `17` | 已固化（之前 handoff §1 写 12 早已过时）|
+| 通道 1 配置 | mqtt/uart/60/43.139.170.206:1002/eb5948ae.../... | ⚠️ **clientid 已过期 16h** |
+
+### 6.2 真实根因（三个独立问题，按发现顺序）
+
+#### 根因 A：log 命令默认关闭（最关键）
+- 官方《DTU指令手册/3、DTU透传固件基本命令.md》§14 明确：`log` 出厂默认 **0（关闭）**
+- 官方《任务和数据模板调试方法 §4.1》："**只有打开了日志输出，才能调试，默认是关闭日志输出的**"
+- 即使 Luatools 一切配置正确，log 关闭时**完全看不到** log.info / I/user.* 输出
+- **修复**：`config,set,log,1` + `config,set,save` + 重启后 `config,get,log` → `1`
+
+#### 根因 B：用户接错 USB 接口（**真正的物理根因**）
+- M100PG-C2 板载 **2 个 micro-USB**（CLAUDE.md §3 之前没强调）：
+  - **"4G-USB"** = DTU 主口 = **调试日志 + config 命令 + 程序下载**（接这个！）
+  - **"USB_TTL"** = Arduino / 扩展串口（**不是调试日志口**）
+- 用户 09-22~09-23 期间接到的是 USB_TTL（Arduino 的口）→ config 命令照常应答（因为 USB_TTL 也走 CH340 串口通信），但 Luatools 通过它**看不到 YED_DTU3 的任何 log**
+- **这一条直接推翻了 handoff §B-4 关于"勾通用串口打印"的猜测**——猜测方向错了，正确做法是接对接口 + 勾"4G模块USB打印"
+- **修复**：把 USB 线从 USB_TTL 拔下，插到 4G-USB 口
+
+#### 根因 C：test broker clientid 已过期 → MQTT 链路掉
+- 2026-09-22 23:00 配的 clientid `eb5948ae86aabf4dcf5dfaa410d0a33d` 已被 test broker 回收（10 分钟无交互规则）
+- 设备 MQTT 握手持续失败：`mqtt_callback param1 -1, event 5 closing socket` + `network_tx ret -1` + `NETtn1 net error` 每 9 秒重试
+- 顺带：`gpfs err 1/2/3` → dtu.yinerda.com 那边的参数文件下载失败 → **task.lua 至今没拉下来**（所以 Luatools 一直没看到 `iotArcTask ===== START =====`）
+- **修复**：刷新 test.yinerda.com 拿新三要素 → 重配通道 1 → save
+
+### 6.3 修复路径实测（13:16~13:20 已完成）
+
+| 步骤 | 操作 | 结果 |
+|---|---|---|
+| 1 | `config,get,log` → 看到 `0` | 确认 log 关闭 |
+| 2 | `config,set,log,1` + `config,set,save` | log 打开，重启 |
+| 3 | 重启后 `config,get,log` → `1` + paramver `17` | log 已固化 |
+| 4 | **USB 线切到 4G-USB**（设备管理器显示 COM8） | 接线正确 |
+| 5 | Luatools 主界面勾 ☑「4G模块USB打印」+ 选 COM8 + 串口日志波特率 115200 + 打开串口 | 开始看 log |
+| 6 | 重启设备 | Luatools 看到完整 boot 日志 |
+
+**Luatools 看到的 boot 日志关键行**（13:16:57 起）：
+```
+[000000000.483] I/user.MainPro YED_DTU3 1.1.21 start reason 0 0 3
+[000000000.582] I/user.CheckAndGetParam json ok
+[000000000.861] I/user.UartInit 1 115200 8 0 1 80        ← main UART 默认 115200 8N1（不是 9600）
+[000000000.911] I/user.NETtn1 MQTT start
+[000000000.936] I/user.NqttListTopic topic id is 1 yed/arc/down
+[000000000.948] I/user.NqttListTopic topic id is 1 yed/arc/up
+[000000000.970] I/user.LbsUseInit.lbs 60 1 1
+[000000001.000] I/user.GpsInit ATGM336H-5NR32
+[000000002.055] NETIF_LINK_ON -> IP_READY
+[000000002.200] mqtt_callback param1 -1, event 5 closing socket  ← 反复出现（clientid 过期）
+[000000002.214] I/user.NETtn1 net error                              ← 反复出现
+```
+
+### 6.4 Luatools 显示的几个关键事实
+
+- **模型显示 "Air780EP/EC718P"**：M100PG-C2 内部基带芯片就是 EC718P。Luatools 自动下错 soc 资源（`LuatOS-SoC_V2024_Air780EP_1.soc`）但只是型号字符串匹配，**不影响 log 解析**。无需手动下载 Air780E 的 soc。
+- **UartInit 115200 8 0 1 80**：设备 main UART（接 Arduino 那个）默认 **115200 8N1**，**不是 handoff §B-4 写的"默认日志波特率 9600"**——handoff 那条没官方依据，已实测推翻。
+- **`MQTT start` → `NqttListTopic` → `NETtn1 net error`**：设备有任务框架（YED_DTU3 内部）启动了，但 **task.lua 没在 Lua 进程里跑**——`iotArcTask ===== START =====` 至今未出现。
+
+### 6.5 待办（用户授权后从步骤 1 重试）
+
+1. **刷新 test.yinerda.com** → MQTT测试工具 → 点"打开" → 拿新三要素（**新 ClientID**）
+2. **关 Luatools** → **YEDTestTools 切到 COM8**（4G-USB）→ 发：
+   ```
+   config,set,mqtt,1,uart,120,<服务器>,<端口>,<新ClientID>,<用户名>,<密码>,1,1,0,0,0,yed/arc/down,yed/arc/up,0,0,0,0,0,0,0,0,0
+   config,set,save
+   ```
+3. 关 YEDTestTools → 开 Luatools → 重启设备
+4. **期望 30~60 秒内** Luatools 看到 `I/user.NETtn1 MQTT connected`（取代反复的 `net error`）+ `iotArcTask ===== START =====`
+5. 如果 30s 后还没看到 START：去 dtu.yinerda.com 看「未更新设备数量」+「分组参数版本 vs 设备 paramver」，必要时手动重新保存一次参数
+
+### 6.6 文档修订建议（阶段 A 收尾前必做）
+
+| 文件 | 修订点 |
+|---|---|
+| `CLAUDE.md §3` | 加一条铁律："调试必须接 **4G-USB**，不是 USB_TTL" |
+| `CLAUDE.md §5` | B-4 状态从"阻塞"更新为"已修复：真根因 = USB 接口选错 + log 默认关闭 + clientid 过期" |
+| `docs/yinerda-platform-ops-guide.md §阶段B 步骤 3` | 加一段说明 log 命令默认关闭 + 必须 `config,set,log,1` |
+| `handoff §1 字段表` | 把心跳从 `120` 改成实测值 `60`（或反之：重配时改回 120） |
+| `cloud/iot-platform.md` | 阶段 C 重建设备时同步更新（暂缓） |
+
+### 6.7 Luatools 自动生成的 trace 日志路径
+
+每次 Trace 模式开关串口都会生成一份独立 log 文件，路径：
+```
+E:\EEprojects\Bomb\Luatools_v3\log\trace_YYYY-MM-DD_HHMMSS.txt
+```
+（13:16 这次：`trace_2026-09-23_131657.txt`，包含完整的 soc log + ap log + 用户虚拟串口 COM10 输出）
+
+如果 Luatools 主窗口被刷掉，trace_*.txt 是完整的回放记录。
