@@ -222,3 +222,66 @@ E:\EEprojects\Bomb\Luatools_v3\log\trace_YYYY-MM-DD_HHMMSS.txt
 （13:16 这次：`trace_2026-09-23_131657.txt`，包含完整的 soc log + ap log + 用户虚拟串口 COM10 输出）
 
 如果 Luatools 主窗口被刷掉，trace_*.txt 是完整的回放记录。
+
+## 7. 阶段 B 进展更新（2026-09-28）：MQTT 链路恢复，卡在分组任务下发
+
+> ⚠️**更正 §6.5 第 2 步**：经 09-28 实测，**"切 COM8 发 config"是错的**——4G-USB（COM8）是 soc 日志口，普通串口工具发 config 只收到 `~0Z` 乱码，命令根本没写进设备。**发 config 命令必须走 USB_TTL（CH340/VCOM 对应主串口 UART1 115200 8N1）**。详见 §7.3。
+
+### 7.1 用户 09-28 实测通过（链路已通）
+
+| 步骤 | 操作（走 **USB_TTL/COM11** CH340） | 结果 |
+|---|---|---|
+| 1 | `config,set,mqtt,1,uart,120,43.139.170.206,1002,88423574a94126c3e141742f72def77,88423574a94126c3e141742f72def77,88888888,1,1,0,0,0,yed/arc/down,yed/arc/up,0,0,0,0,0,0,0,0,0` | `config,mqtt,ok` ✅ |
+| 2 | `config,set,save` | `config,save,ok` ✅ |
+| 3 | `config,get,netstatus,1` | `1`（已连）✅ |
+| 4 | `config,get,ssta` | `4`（至少一路通道连上）✅ |
+| 5 | Luatools（4G-USB/COM8）重启 | `NETtn1 connected` + `msub r 1 yed/arc/down` ✅ |
+| 6 | test web 窗口 topic `yed/arc/up` | 收到定位数据 `121.3877673_028.3658970` ✅ 双向通 |
+
+**结论：MQTT 链路已完全恢复**（不再有 `event 5`/`net error`），test broker 通了，`yined/arc/down` 订阅成功。
+
+### 7.2 新阻塞：task.lua 仍未下发（`ppb param no up`）
+
+Luatools 关键日志：
+```
+[000000002.294] I/user.NETtn1 connected        ← 链路通了（新 clientid 生效）
+[000000002.295] I/user.NETtn1 msub r 1 yed/arc/down
+...
+[000000023.095] I/user.ppb param no up         ← 参数没拉下来
+[000000023.097] E/user.gpfs ok                 ← 分组参数下载失败
+```
+
+**`ppb param no up` = 设备请求 dtu.yinerda.com 的参数，服务器回"无可用更新"** → task.lua 没跟着下发 → `iotArcTask ===== START =====` 仍未出现。
+
+**最可能根因**（按概率）：
+1. **设备没加入分组**（或分组已解除关联）
+2. **分组没绑定任务**（任务代码粘贴到"分组"上，不是设备本身）
+3. **任务/参数保存未成功**（分组的参数版本没推进）
+
+### 7.3 两 USB 口分工（09-28 实测确认，替代 §6.5 的错误指引）
+
+| 口 | 内部桥接 | 用途 |
+|---|---|---|
+| **USB_TTL**（USB-SERIAL CH340） | 主串口 UART1（115200 8N1） | **发 config 命令** / 连 Arduino / 接普通串口工具 |
+| **4G-USB** | 模组调试口（soc/ap log） | 只能 **Luatools** 打开读日志；普通串口工具读是乱码 |
+
+- 发 config → **USB_TTL**
+- 看日志 → **4G-USB + Luatools**
+- 两个口可同时插，不冲突
+
+### 7.4 待办：核对 dtu.yinerda.com 分组任务下发
+
+1. 浏览器 https://dtu.yinerda.com → 设备管理 → IMEI `864865083079369`
+2. 核对三点：
+   - **分组参数版本 vs 设备 paramver**（设备当前应为 18，09-28 又 save 过一次）
+   - **「未更新设备数量」** = 0（不是 1）
+   - **「任务」tab** task.lua 是否还在 / 是否为空
+3. 若任务在但设备没拉到 → **重新保存一次分组参数**强制下发 → 设备重启/等自动更新
+4. 期望 Luatools 出现 `ppb` 成功 + `#define` 加载 + **`iotArcTask ===== START =====`** + 每 5s 一条 `dup` 遥测
+
+### 7.5 状态快照（2026-09-28）
+
+- ✅ log 输出已开（12:37）→ 但 09-28 22:20 重启后的日志没见到 `config,get,log` 复查，默认 09-28 前已 save 固化
+- ✅ MQTT 链路恢复（netstatus=1 / ssta=4 / connected / msub）
+- ⏸ task.lua 下发（`ppb param no up`）——**下一步焦点**
+- ⏭ B-5 双向链路 JSON 验证待 task.lua 跑起来后执行
