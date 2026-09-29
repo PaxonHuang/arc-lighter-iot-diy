@@ -283,5 +283,53 @@ Luatools 关键日志：
 
 - ✅ log 输出已开（12:37）→ 但 09-28 22:20 重启后的日志没见到 `config,get,log` 复查，默认 09-28 前已 save 固化
 - ✅ MQTT 链路恢复（netstatus=1 / ssta=4 / connected / msub）
-- ⏸ task.lua 下发（`ppb param no up`）——**下一步焦点**
+- ✅ **真根因找到并修复（09-29）**：task.lua 缺 `function...end` 外层包装 → v4 已修 → commit `c5c9871`
+- ⏳ 待用户：把新 task.lua 粘贴到 dtu.yinerda.com → 保存 → 重启 → 看 `iotArcTask ===== START =====`
 - ⏭ B-5 双向链路 JSON 验证待 task.lua 跑起来后执行
+
+### 7.6 真根因！task.lua 缺 function...end 外层（09-29 定位并修复）
+
+**结论**：跑了 4 天没等到的 `iotArcTask ===== START =====`，真凶不是 Luatools/波特率/USB口/log/clientid/MQTT 链路，而是 **task.lua 从一开始就是裸代码，没有 `function...end` 外层包装**。
+
+排查到这一步时，M100PG-C2 已经全通：MQTT 链路 `NETtn1 connected` + `msub r 1 yed/arc/down`，平台参数也下发成功，但任务仍不跑。**对照官方《任务和数据模板规范》§五才发现格式铁律**：
+
+```lua
+function                     ← 官方 demo 第一行就是 function
+  local taskname=...
+  while true do
+    ...
+    sys.wait(100)
+  end
+end                          ← 官方 demo 最后一行是 end
+```
+
+而我们仓库的 task.lua v1~v3 是：
+```lua
+--[[ 注释开头 ]]             ← 不是 function！
+local taskname = "iotArcTask"
+log.info(taskname, "===== START =====")
+while true do
+  ...
+end                          ← 这只是 while 的 end
+                             ← 文件到这里结束，没有外层 end
+```
+
+**为什么平台不报错**：DTU 平台"保存参数"能成功、参数版本照常推进（paramver 17→18），但**调度器只执行符合格式的函数体，裸代码静默忽略**——所以既看不到 START，也没有任何错误提示。这是这类设备最坑的一点：**格式错不报错，就是不执行**。
+
+**为什么之前没发现**：
+- handoff §B-4 一直把矛头指向 Luatools 复选框/波特率，方向全错（那些是必要条件，但根本问题在任务本身）
+- `ppb param no up` 一度被误判为"任务没下发"，其实参数版本一致时它本来就该出现，是**正常**的
+- 直到 09-29 把 platform 参数版本彻底对上、MQTT 全通、仍无 START，才回头审视任务代码结构
+
+**修复（task.lua v4，commit `c5c9871`）**：
+- 整个逻辑体包进 `function ... end`
+- 文件头 `--[[ ]]` 改成说明 DTU 任务格式铁律的注释
+- 顶层 `local` 全部移入 function 内（符合规范"所有定义必须写在 function end 内部"）
+- 内部 `local function`（gen_did/send_json/sync_arduino/upload_tele）保持
+- 语法配平验证：function×5 + if×10 + while×1 = 16 end ✓
+
+**下一步（B-4 收尾）**：
+1. 把**整个** `firmware/m100pg-c2/task.lua`（v4，第一行 `function` 开始）粘贴到 dtu.yinerda.com 分组→参数配置→任务→任务1
+2. 点保存参数 → 设备重启
+3. Luatools（4G-USB）看重启日志：应看到 **`iotArcTask ===== START =====`** + 每 5s 一条 `dup` 遥测
+4. 若还没 START：`config,get,paramver` 确认参数版本涨到 19（拉到新任务）+ 截图 Luatools 完整日志
