@@ -333,3 +333,25 @@ end                          ← 这只是 while 的 end
 2. 点保存参数 → 设备重启
 3. Luatools（4G-USB）看重启日志：应看到 **`iotArcTask ===== START =====`** + 每 5s 一条 `dup` 遥测
 4. 若还没 START：`config,get,paramver` 确认参数版本涨到 19（拉到新任务）+ 截图 Luatools 完整日志
+
+### 7.7 ✅ B-4 达成（2026-09-29 17:23）：iotesArcTask ===== START ===== 出现
+
+**成功三元缺一不可**：
+1. **task.lua v4 整个文件重新粘贴**进 dtu.yinerda.com → 分组 → 参数配置 → 任务 → 任务1（不只是改 clientid）
+2. **断开 test.yinerda.com 网页工具的 MQTT 连接**——网页工具占用了与设备相同的 clientid，会无限抢占（设备连上→网页重连抢回→设备被踢 `event 5`）。断网页/关页签让**设备独占**。参ver 此时 = 21。
+3. 设备重启
+
+**Luatools 决定性日志**（重启后仅 0.884s、在网络连上之前就打出）：
+```
+[17:23:01.076][000000000.884] I/user.iotArcTask    ===== START =====
+```
+→ 证明 log 打印不依赖网络，格式对就执行。**真根因（缺 function 包装）彻底坐实。**
+
+**剩余两个小尾巴（不阻塞）**：
+- **MQTT `event 5 net error` 仍间歇出现**：网页工具断开后 broker 可能未立即释放 clientid，或页面仍自动重连。彻底清理：**整个关闭 test.yinerda.com 页签** → 刷新重新拿全新 clientid → 重配 platform 通道参数 → save。
+- **`ppb param no up` + `gpfs err is 1`**：参数版本一致时 `param no up` 属正常；task 早已下发（START 已证明），`gpfs err` 只是遥测参数文件小失败，不影响任务运行。
+
+**当前阶段 B 状态**：
+- ✅ B-1/B-2/B-3 完成
+- ✅ **B-4 达成**：task.lua v4 运行成功，Luatools 看到 `iotArcTask ===== START =====`
+- ⏭ **B-5（下一步）**：设备连上 broker 后，test 工具订阅 `yed/arc/up`、向 `yed/arc/down` 发 `{"cmd":"set_relay","did":"t1","param":{"sw1":1}}`，期望 1~3s 收 `set_relay_bck`（did=t1，rst=0）+ 4s 后收 `relay_timeout` 事件。待 MQTT 完全干净后测。
