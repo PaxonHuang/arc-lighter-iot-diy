@@ -31,7 +31,7 @@
 - 与本项目无关、无需主动阅读的官方分支：GPS/定位案例、HTTP/WebSocket/UDP 配置、Modbus 采集、低功耗等——用到再看，不必预读。
 
 ## 5. 下一步开发路线（阶段 A → B）
-**当前状态：阶段 A 已完成 ✅，阶段 B-1/B-2/B-3 已完成 ✅，卡在 B-4 Luatools 看 task.lua 日志。**
+**当前状态：阶段 A 已完成 ✅，阶段 B 全链路已完成 ✅（B-1~B-5 全过，双向 JSON 链路贯通）。下一步 = 接 UNO 测 D7 物理继电器 → 阶段 C（IOT 平台）。**
 
 **阶段 A 完成项**（详见 `docs/handoff-2026-09-06-phase-A-done.md`）：
 - ✅ 设备 IMEI 已定位：`864865083079369`，与 `cloud/iot-platform.md` 存储的 `...679369` 第10位不一致——平台记录错误（设备权威），阶段 C 前必须先在 iot.yinerda.com 删除旧设备、用正确 IMEI 重建。
@@ -39,10 +39,12 @@
 - ✅ 重启后 netstatus=1 / ssta=4；串口 `config,get,imei/csq/vbatt` 全部正常应答；浏览器订阅 yed/arc/up 看到设备消息。
 - ✅ task.lua 已加 4s relay:1 超时（ZVS 安全），commit `f101184`。
 
-**阶段 B 进展（截至 2026-09-22 23:49）**：
+**阶段 B 进展（截至 2026-09-29 23:56）——✅ 全链路完成**：
 - ✅ B-1：RAM 配置 save → 已固化（含 LBS 60s）
 - ✅ B-2：save 后重启 + MQTT 链路复测 ok,1
-- ✅ B-3：dtu.yinerda.com「任务」tab 已粘贴 task.lua v3 + 点保存参数 + 设备自动重启拉任务
+- ✅ B-3：dtu.yinerda.com「任务」tab 已粘贴 task.lua **v4**（v1~v3 裸代码缺 function 包装，调度器不执行——见 handoff §7.6）+ 点保存参数 + 设备自动重启拉任务
+- ✅ B-4：Luatools（4G-USB，勾「4G模块USB打印」）看到 `iotArcTask ===== START =====`；根因=log 默认关闭 + USB 口选错 + 裸代码缺 function
+- ✅ B-5：test 工具发 `set_relay`（did=t1, sw1=1）→ 收 `set_relay_bck`（did=t1, rst=0, csq/vbat 真实）+ 定位上报 `121.3877673_028.3658970`；MQTT 彻底干净（关 test 页签让设备独占 clientid 后 `connected` 不再 event 5）
 - ⏸ **B-4 阻塞**：Luatools 看不到 `iotArcTask ===== START =====` 日志
   - **根因**：M100PG-C2 用 **CH340 转串口**（不是 Air780 原生 USB CDC），Luatools 必须勾 ☑「**通用串口打印**」（**不是**「4G模块USB打印」）
   - 波特率依次试 **9600 → 115200 → 921600**

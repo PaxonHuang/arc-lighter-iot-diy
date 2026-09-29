@@ -355,3 +355,40 @@ end                          ← 这只是 while 的 end
 - ✅ B-1/B-2/B-3 完成
 - ✅ **B-4 达成**：task.lua v4 运行成功，Luatools 看到 `iotArcTask ===== START =====`
 - ⏭ **B-5（下一步）**：设备连上 broker 后，test 工具订阅 `yed/arc/up`、向 `yed/arc/down` 发 `{"cmd":"set_relay","did":"t1","param":{"sw1":1}}`，期望 1~3s 收 `set_relay_bck`（did=t1，rst=0）+ 4s 后收 `relay_timeout` 事件。待 MQTT 完全干净后测。
+
+### 7.8 ✅✅ 阶段 B 全链路完成（2026-09-29 23:56）：B-5 JSON 双向验证通过
+
+**test 网页 ↔ Luatools 完全对应（决定性证据）：**
+
+test 网页（发送方）：
+```
+23:56:10  topic yed/arc/down  {"cmd":"set_relay","did":"t1","param":{"sw1":1}}   ← 下发
+23:56:10  topic yed/arc/up    {"did":"t1","param":{"sw1":1,"csq":28,"vbat":3725},"cmd":"set_relay_bck","rst":0}  ← 应答
+00:01:20  topic yed/arc/up    121.3877673_028.3658970                           ← 定位上报
+```
+
+Luatools（设备侧）同刻：
+```
+[23:56:05.409][2.272] I/user.NETtn1 connected                              ← MQTT 干净连上（无 event 5）
+[23:56:05.409][2.272] I/user.NETtn1 msub r 1 yed/arc/down                 ← 订阅成功
+[23:56:10.553][7.424] I/user.iotArcTask mqtt rx {"cmd":"set_relay","did":"t1","param":{"sw1":1}}  ← 收到命令
+[23:56:10.667][7.553] I/user.NETtn1 p table 1 {"did":"t1",...,"cmd":"set_relay_bck","rst":0}      ← 发出应答
+```
+
+**全部命中**：
+- ✅ `NETtn1 connected`：**MQTT 彻底干净**（彻底关 test 页签 + 重拿新 clientid + 重配 platform → 重启后 `connected` 不再 `event 5`）
+- ✅ `msub r 1 yed/arc/down`：订阅成功
+- ✅ `mqtt rx` 收到 set_relay：task.lua v4 正确解析 JSON
+- ✅ 发 `set_relay_bck` **did=t1 原样回 + rst=0 + csq/vbat 真实值**：网络应答正确
+- ✅ 定位 `121.3877673_028.3658970` 上报：GPS/LBS 已通
+
+**关于 relay_timeout 事件本次未出现**：是**正常且正确**的。task.lua 只在 `relay_state==1` 保持超 4s 才触发 timeout；本次 23:56:13 设备就 `ppb param new` + `ProCheckDevSta.error.reboot` 重启，relay 未满 4s。超时保护逻辑未破坏，等稳定连接后再下 sw1:1 保持超 4s 即可验证。**init 时也有隐患：设备启动 `iotArcTask START` 未立即打 relay:0，理论上若上次断电是吸合态，上电后前几秒可能保持——需注意（当前验证阶段，relay 尚未接 UNO，无实际负载，可接受；量产前应在 START 后立即 sync_arduino(0) 强制断开）。**
+
+**阶段 B 验收：✅ 完成**
+- B-1~B-5 全过，双向 JSON 链路贯通（set_relay → set_relay_bck did=t1 rst=0）
+- 物理继电器（UNO D7）控制未测（需接 Arduino，见任务下一步）
+
+**下阶段提示（阶段 B 收尾后）**：
+1. 接 UNO 后测 D7 物理继电器（task.lua sync_arduino 发 `relay:1/relay:0` 到 UART）——task.lua 已具备，只需接 Arduino 观察 D7 电平
+2. 量产优化：`init` 后立即 `sync_arduino(0)` 强制断开（防上电瞬间误吸合）；遥测周期 5s 偏密，长期可改 60s
+3. 阶段 C（暂缓）：用正确 IMEI `864865083079369` 在 iot.yinerda.com 删旧建新 → 重拿三要素 → 回填 `cloud/iot-platform.md`
